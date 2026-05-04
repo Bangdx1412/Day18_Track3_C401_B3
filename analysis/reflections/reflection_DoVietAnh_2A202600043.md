@@ -7,7 +7,7 @@
 
 ## 1. Đóng góp kỹ thuật
 
-- **Module đã implement:** Module 2 - Hybrid Search.
+- **Module đã implement:** `src/m2_search.py`- Module 2: Hybrid Search.
 - **Các hàm/class chính đã viết:** 
     - `segment_vietnamese()`: Sử dụng `underthesea` để tách từ tiếng Việt.
     - `BM25Search`: Lập chỉ mục và tìm kiếm bằng thuật toán BM25 (Rank-BM25).
