@@ -24,8 +24,20 @@ def build_pipeline():
     all_chunks = []
     for doc in docs:
         parents, children = chunk_hierarchical(doc["text"], metadata=doc["metadata"])
+        parent_lookup = {
+            parent.metadata["parent_id"]: parent.text
+            for parent in parents
+        }
         for child in children:
-            all_chunks.append({"text": child.text, "metadata": {**child.metadata, "parent_id": child.parent_id}})
+            all_chunks.append({
+                "text": child.text,
+                "metadata": {
+                    **child.metadata,
+                    "parent_id": child.parent_id,
+                    "parent_text": parent_lookup.get(child.parent_id, child.text),
+                    "raw_text": child.text,
+                },
+            })
     print(f"  {len(all_chunks)} chunks from {len(docs)} documents")
 
     # Step 2: Enrichment (M5)
@@ -33,7 +45,13 @@ def build_pipeline():
     enriched = enrich_chunks(all_chunks, methods=["contextual", "hyqa", "metadata"])
     if enriched:
         # Use enriched text for indexing
-        all_chunks = [{"text": e.enriched_text, "metadata": e.auto_metadata} for e in enriched]
+        all_chunks = [
+            {
+                "text": e.enriched_text,
+                "metadata": {**e.auto_metadata, "raw_text": e.original_text},
+            }
+            for e in enriched
+        ]
         print(f"  Enriched {len(enriched)} chunks")
     else:
         print("  ⚠️  M5 not implemented — using raw chunks (fallback)")
@@ -50,23 +68,59 @@ def build_pipeline():
     return search, reranker
 
 
+def _select_contexts(ranked_docs: list, fallback_docs: list, top_k: int = RERANK_TOP_K) -> list[str]:
+    """Return source contexts for generation: parent/raw text, not enriched index text."""
+    contexts = []
+    seen = set()
+
+    for doc in ranked_docs or fallback_docs[:top_k]:
+        metadata = getattr(doc, "metadata", None)
+        text = getattr(doc, "text", "")
+        if metadata is None and isinstance(doc, dict):
+            metadata = doc.get("metadata", {})
+            text = doc.get("text", "")
+
+        metadata = metadata or {}
+        source_text = metadata.get("parent_text") or metadata.get("raw_text") or text
+        key = metadata.get("parent_id") or source_text
+        if source_text and key not in seen:
+            contexts.append(source_text)
+            seen.add(key)
+        if len(contexts) >= top_k:
+            break
+
+    return contexts
+
+
 def run_query(query: str, search: HybridSearch, reranker: CrossEncoderReranker) -> tuple[str, list[str]]:
     """Run single query through pipeline."""
     results = search.search(query)
     docs = [{"text": r.text, "score": r.score, "metadata": r.metadata} for r in results]
     reranked = reranker.rerank(query, docs, top_k=RERANK_TOP_K)
-    contexts = [r.text for r in reranked] if reranked else [r.text for r in results[:3]]
+    contexts = _select_contexts(reranked, docs, top_k=RERANK_TOP_K)
 
-    # TODO (nhóm): Replace with LLM generation for better scores
-    # from openai import OpenAI
-    # client = OpenAI()
-    # context_str = "\n\n".join(contexts)
-    # resp = client.chat.completions.create(model="gpt-4o-mini", messages=[
-    #     {"role": "system", "content": "Trả lời CHỈ dựa trên context. Nếu không có → nói 'Không tìm thấy.'"},
-    #     {"role": "user", "content": f"Context:\n{context_str}\n\nCâu hỏi: {query}"},
-    # ])
-    # answer = resp.choices[0].message.content
-    answer = contexts[0] if contexts else "Không tìm thấy thông tin."
+    from openai import OpenAI
+    client = OpenAI()
+    context_str = "\n\n".join(contexts)
+    resp = client.chat.completions.create(
+        model="gpt-5.4-nano",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Trả lời ngắn gọn bằng tiếng Việt, CHỈ dựa trên context. "
+                    "Giữ nguyên số liệu, tên cơ quan, điều/khoản nếu có. "
+                    "Không thêm kiến thức ngoài context. "
+                    "Nếu context không có thông tin thì nói 'Không tìm thấy.'"
+                ),
+            },
+            {"role": "user", "content": f"Context:\n{context_str}\n\nCâu hỏi: {query}"},
+        ],
+        temperature=0,
+        max_completion_tokens=300,
+    )
+    answer = resp.choices[0].message.content
+    # answer = contexts[0] if contexts else "Không tìm thấy thông tin."
     return answer, contexts
 
 
