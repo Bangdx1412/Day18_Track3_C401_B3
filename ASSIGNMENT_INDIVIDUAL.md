@@ -186,3 +186,12 @@ Làm giàu chunks trước khi embed — 4 techniques:
 - Cần `OPENAI_API_KEY` trong `.env` (hoặc dùng extractive fallback không cần API)
 - Enrichment = **one-time cost** khi indexing. Dùng `gpt-4o-mini` để tiết kiệm
 - ROI cao: cải thiện **mọi query** sau đó
+
+---
+
+## Báo cáo thực hiện Module 2 (Đặng Xuân Bằng)
+
+- **Công việc đã làm:** Hoàn thiện toàn bộ logic cho Hybrid Search bao gồm BM25, Dense Search và RRF fusion.
+- **Kết quả:** Vượt qua **5/5** test cases, đã tích hợp thành công Qdrant và BGE-M3.
+- **Khó khăn:** Xử lý sự không nhất quán trong tách từ tiếng Việt của `underthesea` và cấu hình môi trường Qdrant.
+- **Tệp báo cáo chi tiết:** [reflection_Bangdx.md](analysis/reflections/reflection_Bangdx.md)
