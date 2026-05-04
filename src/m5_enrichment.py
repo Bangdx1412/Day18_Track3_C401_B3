@@ -47,7 +47,7 @@ def summarize_chunk(text: str) -> str:
 
             client = OpenAI(api_key=OPENAI_API_KEY)
             resp = client.chat.completions.create(
-                model="gpt-5.4-nano",
+                model="gpt-4o-mini",
                 messages=[
                     {
                         "role": "system",
@@ -95,7 +95,7 @@ def generate_hypothesis_questions(text: str, n_questions: int = 3) -> list[str]:
 
             client = OpenAI(api_key=OPENAI_API_KEY)
             resp = client.chat.completions.create(
-                model="gpt-5.4-nano",
+                model="gpt-4o-mini",
                 messages=[
                     {
                         "role": "system",
@@ -145,7 +145,7 @@ def contextual_prepend(text: str, document_title: str = "") -> str:
 
             client = OpenAI(api_key=OPENAI_API_KEY)
             resp = client.chat.completions.create(
-                model="gpt-5.4-nano",
+                model="gpt-4o-mini",
                 messages=[
                     {
                         "role": "system",
@@ -195,7 +195,7 @@ def extract_metadata(text: str) -> dict:
             import json
             client = OpenAI(api_key=OPENAI_API_KEY)
             resp = client.chat.completions.create(
-                model="gpt-5.4-nano",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": 'Trích xuất metadata từ đoạn văn. Trả về JSON: {"topic": "...", "entities": ["..."], "category": "policy|hr|it|finance", "language": "vi|en"}'},
                     {"role": "user", "content": text},
@@ -238,7 +238,8 @@ def enrich_chunks(
     run_contextual = "contextual" in methods or "full" in methods
     run_metadata = "metadata" in methods or "full" in methods
 
-    for chunk in chunks:
+    total = len(chunks)
+    for i, chunk in enumerate(chunks, 1):
         text = chunk.get("text", "")
         meta = chunk.get("metadata", {}) or {}
 
@@ -261,6 +262,9 @@ def enrich_chunks(
                 method="+".join(methods),
             )
         )
+
+        if i % 10 == 0 or i == total:
+            print(f"  [enrich] {i}/{total} chunks", flush=True)
 
     return enriched
 

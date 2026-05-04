@@ -29,7 +29,7 @@
 ## 3. Khó khăn & Cách giải quyết
 
 - Khó khăn lớn nhất: cân bằng giữa "dùng API thật để có chất lượng tốt" và "test phải pass kể cả khi máy chấm bài không có `OPENAI_API_KEY`". Test `test_contextual_contains_original` bắt buộc `SAMPLE in result`, còn `test_summarize_returns_string` đòi return string không null.
-- Cách giải quyết: thiết kế **dual-path** cho cả 3 hàm. Path chính gọi `gpt-4o-mini` qua `from openai import OpenAI`, path fallback dùng heuristic không cần API:
+- Cách giải quyết: thiết kế **dual-path** cho cả 3 hàm. Path chính gọi `gpt-5.4-nano` qua `from openai import OpenAI`, path fallback dùng heuristic không cần API:
   - `summarize_chunk` → split câu theo `". "` rồi lấy 2 câu đầu.
   - `generate_hypothesis_questions` → trả `[]` (test chấp nhận list rỗng vì có guard `if result:`).
   - `contextual_prepend` → ghép template `"Trích từ tài liệu '{document_title}'."` + `\n\n` + text gốc, đảm bảo `SAMPLE in result` luôn đúng.

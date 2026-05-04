@@ -103,7 +103,7 @@ def run_query(query: str, search: HybridSearch, reranker: CrossEncoderReranker) 
     client = OpenAI()
     context_str = "\n\n".join(contexts)
     resp = client.chat.completions.create(
-        model="gpt-5.4-nano",
+        model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
