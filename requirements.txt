@@ -1,0 +1,11 @@
+underthesea 
+rank_bm25 
+qdrant-client 
+sentence-transformers 
+transformers 
+numpy 
+ragas 
+datasets 
+openai 
+python-dotenv 
+torch
