@@ -189,22 +189,24 @@ def extract_metadata(text: str) -> dict:
     Returns:
         Dict with extracted metadata fields.
     """
-    # TODO: Implement auto metadata extraction
-    # 1. from openai import OpenAI
-    #    import json
-    #    client = OpenAI()
-    # 2. resp = client.chat.completions.create(
-    #        model="gpt-4o-mini",
-    #        messages=[
-    #            {"role": "system", "content": 'Trích xuất metadata từ đoạn văn. Trả về JSON: {"topic": "...", "entities": ["..."], "category": "policy|hr|it|finance", "language": "vi|en"}'},
-    #            {"role": "user", "content": text},
-    #        ],
-    #        max_tokens=150,
-    #    )
-    # 3. return json.loads(resp.choices[0].message.content)
-    #
-    # Metadata này gắn vào chunk → enable rich filtering khi search
-    # VD: filter category="policy" + topic="nghỉ phép" → precision tăng
+    if OPENAI_API_KEY:
+        try:
+            from openai import OpenAI
+            import json
+            client = OpenAI(api_key=OPENAI_API_KEY)
+            resp = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": 'Trích xuất metadata từ đoạn văn. Trả về JSON: {"topic": "...", "entities": ["..."], "category": "policy|hr|it|finance", "language": "vi|en"}'},
+                    {"role": "user", "content": text},
+                ],
+                max_tokens=150,
+                response_format={ "type": "json_object" },
+            )
+            return json.loads(resp.choices[0].message.content)
+        except Exception:
+            pass
+
     return {}
 
 
@@ -231,24 +233,34 @@ def enrich_chunks(
 
     enriched = []
 
-    # TODO: Implement enrichment pipeline
-    # For each chunk:
-    #   1. summary = summarize_chunk(chunk["text"]) if "summary" in methods or "full" in methods
-    #   2. questions = generate_hypothesis_questions(chunk["text"]) if "hyqa" in methods or "full" in methods
-    #   3. enriched_text = contextual_prepend(chunk["text"], chunk["metadata"].get("source", ""))
-    #      if "contextual" in methods or "full" in methods
-    #   4. auto_meta = extract_metadata(chunk["text"]) if "metadata" in methods or "full" in methods
-    #   5. Create EnrichedChunk(
-    #          original_text=chunk["text"],
-    #          enriched_text=enriched_text or chunk["text"],
-    #          summary=summary or "",
-    #          hypothesis_questions=questions or [],
-    #          auto_metadata={**chunk["metadata"], **auto_meta},
-    #          method="+".join(methods),
-    #      )
-    #
-    # Lưu ý: Enrichment = one-time cost (offline). Dùng model rẻ (gpt-4o-mini).
-    # ROI cao vì cải thiện MỌI query sau đó.
+    run_summary = "summary" in methods or "full" in methods
+    run_hyqa = "hyqa" in methods or "full" in methods
+    run_contextual = "contextual" in methods or "full" in methods
+    run_metadata = "metadata" in methods or "full" in methods
+
+    for chunk in chunks:
+        text = chunk.get("text", "")
+        meta = chunk.get("metadata", {}) or {}
+
+        summary = summarize_chunk(text) if run_summary else ""
+        questions = generate_hypothesis_questions(text) if run_hyqa else []
+        enriched_text = (
+            contextual_prepend(text, meta.get("source", ""))
+            if run_contextual
+            else text
+        )
+        auto_meta = extract_metadata(text) if run_metadata else {}
+
+        enriched.append(
+            EnrichedChunk(
+                original_text=text,
+                enriched_text=enriched_text or text,
+                summary=summary or "",
+                hypothesis_questions=questions or [],
+                auto_metadata={**meta, **auto_meta},
+                method="+".join(methods),
+            )
+        )
 
     return enriched
 
