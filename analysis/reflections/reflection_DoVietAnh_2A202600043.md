@@ -1,6 +1,6 @@
 # Individual Reflection — Lab 18
 
-**Tên:** Đặng Xuân Bằng  
+**Tên:** Đỗ Việt Anh 
 **Module phụ trách:** M2: Hybrid Search
 
 ---
