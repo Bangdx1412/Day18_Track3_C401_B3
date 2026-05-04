@@ -38,24 +38,37 @@ def summarize_chunk(text: str) -> str:
     Returns:
         Summary string (2-3 câu).
     """
-    # TODO: Implement chunk summarization
-    # Option A (với OpenAI):
-    #   from openai import OpenAI
-    #   client = OpenAI()
-    #   resp = client.chat.completions.create(
-    #       model="gpt-4o-mini",
-    #       messages=[
-    #           {"role": "system", "content": "Tóm tắt đoạn văn sau trong 2-3 câu ngắn gọn bằng tiếng Việt."},
-    #           {"role": "user", "content": text},
-    #       ],
-    #       max_tokens=150,
-    #   )
-    #   return resp.choices[0].message.content.strip()
-    #
-    # Option B (không cần API — extractive):
-    #   sentences = text.split(". ")
-    #   return ". ".join(sentences[:2]) + "."  # Lấy 2 câu đầu
-    return ""
+    if not text or not text.strip():
+        return ""
+
+    if OPENAI_API_KEY:
+        try:
+            from openai import OpenAI
+
+            client = OpenAI(api_key=OPENAI_API_KEY)
+            resp = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Tóm tắt đoạn văn sau trong 2-3 câu ngắn gọn bằng tiếng Việt.",
+                    },
+                    {"role": "user", "content": text},
+                ],
+                max_tokens=150,
+                temperature=0.2,
+            )
+            return resp.choices[0].message.content.strip()
+        except Exception:
+            pass
+
+    sentences = [s.strip() for s in text.split(". ") if s.strip()]
+    if not sentences:
+        return text.strip()
+    summary = ". ".join(sentences[:2])
+    if not summary.endswith("."):
+        summary += "."
+    return summary
 
 
 # ─── Technique 2: Hypothesis Question-Answer (HyQA) ─────
@@ -73,23 +86,37 @@ def generate_hypothesis_questions(text: str, n_questions: int = 3) -> list[str]:
     Returns:
         List of question strings.
     """
-    # TODO: Implement hypothesis question generation
-    # 1. from openai import OpenAI
-    #    client = OpenAI()
-    # 2. resp = client.chat.completions.create(
-    #        model="gpt-4o-mini",
-    #        messages=[
-    #            {"role": "system", "content": f"Dựa trên đoạn văn, tạo {n_questions} câu hỏi mà đoạn văn có thể trả lời. Trả về mỗi câu hỏi trên 1 dòng."},
-    #            {"role": "user", "content": text},
-    #        ],
-    #        max_tokens=200,
-    #    )
-    # 3. questions = resp.choices[0].message.content.strip().split("\n")
-    # 4. return [q.strip().lstrip("0123456789.-) ") for q in questions if q.strip()]
-    #
-    # Tại sao: User hỏi "nghỉ phép bao nhiêu ngày?" nhưng doc viết
-    # "12 ngày làm việc mỗi năm" → vocabulary gap. HyQA bridge gap này
-    # bằng cách index câu hỏi "Nhân viên được nghỉ bao nhiêu ngày?" cùng chunk.
+    if not text or not text.strip() or n_questions <= 0:
+        return []
+
+    if OPENAI_API_KEY:
+        try:
+            from openai import OpenAI
+
+            client = OpenAI(api_key=OPENAI_API_KEY)
+            resp = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            f"Dựa trên đoạn văn, tạo {n_questions} câu hỏi bằng tiếng Việt "
+                            "mà đoạn văn có thể trả lời. Trả về mỗi câu hỏi trên 1 dòng, "
+                            "không đánh số, kết thúc bằng dấu '?'."
+                        ),
+                    },
+                    {"role": "user", "content": text},
+                ],
+                max_tokens=200,
+                temperature=0.3,
+            )
+            raw = resp.choices[0].message.content.strip().split("\n")
+            questions = [q.strip().lstrip("0123456789.-) ").strip() for q in raw]
+            questions = [q for q in questions if q]
+            return questions[:n_questions]
+        except Exception:
+            pass
+
     return []
 
 
@@ -108,24 +135,45 @@ def contextual_prepend(text: str, document_title: str = "") -> str:
     Returns:
         Text với context prepended.
     """
-    # TODO: Implement contextual prepend
-    # 1. from openai import OpenAI
-    #    client = OpenAI()
-    # 2. resp = client.chat.completions.create(
-    #        model="gpt-4o-mini",
-    #        messages=[
-    #            {"role": "system", "content": "Viết 1 câu ngắn mô tả đoạn văn này nằm ở đâu trong tài liệu và nói về chủ đề gì. Chỉ trả về 1 câu."},
-    #            {"role": "user", "content": f"Tài liệu: {document_title}\n\nĐoạn văn:\n{text}"},
-    #        ],
-    #        max_tokens=80,
-    #    )
-    # 3. context = resp.choices[0].message.content.strip()
-    # 4. return f"{context}\n\n{text}"
-    #
-    # Ví dụ output:
-    #   "Trích từ Chương 3 - Chính sách nghỉ phép, Sổ tay VinUni 2024.
-    #    Nhân viên chính thức được nghỉ phép năm 12 ngày..."
-    return text
+    if not text or not text.strip():
+        return text
+
+    context = ""
+    if OPENAI_API_KEY:
+        try:
+            from openai import OpenAI
+
+            client = OpenAI(api_key=OPENAI_API_KEY)
+            resp = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Viết 1 câu ngắn bằng tiếng Việt mô tả đoạn văn này "
+                            "nằm ở đâu trong tài liệu và nói về chủ đề gì. "
+                            "Chỉ trả về đúng 1 câu."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Tài liệu: {document_title}\n\nĐoạn văn:\n{text}",
+                    },
+                ],
+                max_tokens=80,
+                temperature=0.2,
+            )
+            context = resp.choices[0].message.content.strip()
+        except Exception:
+            context = ""
+
+    if not context:
+        if document_title:
+            context = f"Trích từ tài liệu '{document_title}'."
+        else:
+            context = "Trích từ tài liệu nội bộ."
+
+    return f"{context}\n\n{text}"
 
 
 # ─── Technique 4: Auto Metadata Extraction ──────────────
